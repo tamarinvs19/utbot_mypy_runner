@@ -7,7 +7,6 @@ from collections import defaultdict
 
 import mypy.nodes
 import mypy.types
-import mypy.maptype
 
 import utbot_mypy_runner.mypy_main as mypy_main
 
@@ -127,9 +126,9 @@ class CompositeAnnotationNode(AnnotationNode):
         self.simple_name: str = symbol_node._fullname.split('.')[-1]
 
         self.names: tp.Dict[str, Definition] = {}
+        defs: tp.List[NodeInfo] = get_infos_of_nodes([x.node for x in symbol_node.names.values()])
         for name in symbol_node.names.keys():
             inner_symbol_node = symbol_node.names[name]
-            defs: tp.List[NodeInfo] = get_infos_of_nodes(symbol_node.defn.defs.body)
             definition = get_definition_from_node(inner_symbol_node, False, self.namespace, defs, name)
             if definition is not None:
                 self.names[name] = definition
