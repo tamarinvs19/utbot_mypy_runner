@@ -63,7 +63,7 @@ class FunctionNode(AnnotationNode):
         elif isinstance(function_like, mypy.nodes.FuncItem):
             self.positional = [
                 get_annotation(any_type_instance, meta=self.namespace)
-                for _ in range(function_like.min_args)
+                for _ in range(len(function_like.arguments))
             ]
             self.return_type = get_annotation(any_type_instance, meta=self.namespace)
             self.type_vars = []
@@ -354,7 +354,7 @@ def get_definition_from_node(
 
     node = table_node.node
     info = next(filter(lambda x: x.name == name, defined_nodes))
-    #sys.stderr.write(f"{info.line} {info.column} {info.end_line} {info.end_column}\n")
+    # sys.stderr.write(f"{info.line} {info.column} {info.end_line} {info.end_column}\n")
 
     if isinstance(node, mypy.nodes.TypeInfo):
         return TypeDefinition(node, info.line, info.column)
