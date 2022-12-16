@@ -369,16 +369,18 @@ def get_definition_from_node(
 
 
 class ExpressionType:
-    def __init__(self, start_offset: int, end_offset: int, type_: mypy.types.Type):
+    def __init__(self, start_offset: int, end_offset: int, line: int, type_: Annotation):
         self.start_offset = start_offset
         self.end_offset = end_offset
+        self.line = line
         self.type_ = type_
 
     def encode(self):
         return {
             "startOffset": self.start_offset, 
             "endOffset": self.end_offset, 
-            "type": get_annotation(self.type_, Meta()).encode()  # TODO: proper Meta
+            "line": self.line,
+            "type": self.type_.encode()
         }
 
 
@@ -456,8 +458,8 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
         with open(mypy_file.path, "r") as file:
             content = file.readlines()
             processor = lambda line, col, end_line, end_col, type_: \
-                    expression_types[module_for_types].append(
-                        ExpressionType(*get_borders(line, col, end_line, end_col, content), type_)
+                    expression_types[module_for_types].append( # TODO: proper Meta
+                        ExpressionType(*get_borders(line, col, end_line, end_col, content), line, get_annotation(type_, Meta()))
                     )
             traverser = expression_traverser.MyTraverserVisitor(build_result.types, processor)
             traverser.visit_mypy_file(build_result.files[module_for_types])
