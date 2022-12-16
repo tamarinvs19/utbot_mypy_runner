@@ -9,6 +9,8 @@ import mypy.nodes
 import mypy.types
 
 import utbot_mypy_runner.mypy_main as mypy_main
+import utbot_mypy_runner.expression_traverser as expression_traverser
+from utbot_mypy_runner.utils import get_borders
 
 
 annotation_node_dict: tp.Dict[str, "AnnotationNode"] = {}
@@ -366,8 +368,23 @@ def get_definition_from_node(
         return None
 
 
-def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]]):
-    result: tp.Dict[str, tp.Any] = {'nodeStorage': {}}
+class ExpressionType:
+    def __init__(self, start_offset: int, end_offset: int, type_: mypy.types.Type):
+        self.start_offset = start_offset
+        self.end_offset = end_offset
+        self.type_ = type_
+
+    def encode(self):
+        return {
+            "startOffset": self.start_offset, 
+            "endOffset": self.end_offset, 
+            "type": get_annotation(self.type_, Meta()).encode()  # TODO: proper Meta
+        }
+
+
+def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]], 
+                    expression_types: tp.Dict[str, tp.List[ExpressionType]]):
+    result: tp.Dict[str, tp.Any] = {'nodeStorage': {}, 'types': {}}
     for key in annotation_node_dict:
         result['nodeStorage'][str(key)] = annotation_node_dict[key].encode()
     result['definitions'] = {}
@@ -375,6 +392,10 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]]):
         result['definitions'][module] = {}
         for name in annotations[module].keys():
             result['definitions'][module][name] = annotations[module][name].encode()
+
+    for module in expression_types.keys():
+        result['types'][module] = [x.encode() for x in expression_types[module]]
+
     return json.dumps(result)
 
 
@@ -398,9 +419,6 @@ def get_info_of_node(node) -> tp.Optional[NodeInfo]:
     return None
 
 
-#def _decrease_pos(line, number)
-
-
 def get_infos_of_nodes(nodes: tp.List) -> tp.List[NodeInfo]:
     result = []
     for node in nodes:
@@ -410,7 +428,8 @@ def get_infos_of_nodes(nodes: tp.List) -> tp.List[NodeInfo]:
     return result
 
 
-def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source_paths: tp.List[str]) -> str:
+def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
+                               source_paths: tp.List[str], module_for_types: tp.Optional[str]) -> str:
     annotation_dict: tp.Dict[str, tp.Dict[str, Definition]] = {}
     for module in build_result.files.keys():
         annotation_dict[module] = {}
@@ -431,4 +450,16 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source
             if definition is not None:
                 annotation_dict[module][name] = definition
 
-    return get_output_json(annotation_dict)
+    expression_types: tp.Dict[str, tp.List[ExpressionType]] = defaultdict(list)
+    if module_for_types is not None:
+        mypy_file = build_result.files[module_for_types]
+        with open(mypy_file.path, "r") as file:
+            content = file.readlines()
+            processor = lambda line, col, end_line, end_col, type_: \
+                    expression_types[module_for_types].append(
+                        ExpressionType(*get_borders(line, col, end_line, end_col, content), type_)
+                    )
+            traverser = expression_traverser.MyTraverserVisitor(build_result.types, processor)
+            traverser.visit_mypy_file(build_result.files[module_for_types])
+
+    return get_output_json(annotation_dict, expression_types)
