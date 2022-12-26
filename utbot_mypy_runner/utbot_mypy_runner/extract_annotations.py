@@ -385,7 +385,8 @@ class ExpressionType:
 
 
 def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]], 
-                    expression_types: tp.Dict[str, tp.List[ExpressionType]]):
+                    expression_types: tp.Dict[str, tp.List[ExpressionType]],
+                    module_map: tp.Dict[str, str]):
     result: tp.Dict[str, tp.Any] = {'nodeStorage': {}, 'types': {}}
     for key in annotation_node_dict:
         result['nodeStorage'][str(key)] = annotation_node_dict[key].encode()
@@ -397,6 +398,8 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]],
 
     for module in expression_types.keys():
         result['types'][module] = [x.encode() for x in expression_types[module]]
+
+    result['fileToModule'] = module_map
 
     return json.dumps(result)
 
@@ -433,6 +436,7 @@ def get_infos_of_nodes(nodes: tp.List) -> tp.List[NodeInfo]:
 def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
                                source_paths: tp.List[str], module_for_types: tp.Optional[str]) -> str:
     annotation_dict: tp.Dict[str, tp.Dict[str, Definition]] = {}
+    module_map: tp.Dict[str, str] = {}
     for module in build_result.files.keys():
         annotation_dict[module] = {}
         mypy_file: mypy.nodes.MypyFile = build_result.files[module]
@@ -442,6 +446,7 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
             with open(mypy_file.path, "r") as file:
                 current_file = file.readlines()
             defs = get_infos_of_nodes(mypy_file.defs)
+            module_map[mypy_file.path] = module
         else:
             current_file = None
             defs = get_infos_of_nodes([x.node for x in mypy_file.names.values()])
@@ -464,4 +469,4 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
             traverser = expression_traverser.MyTraverserVisitor(build_result.types, processor)
             traverser.visit_mypy_file(build_result.files[module_for_types])
 
-    return get_output_json(annotation_dict, expression_types)
+    return get_output_json(annotation_dict, expression_types, module_map)
