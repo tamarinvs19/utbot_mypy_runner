@@ -19,12 +19,11 @@ class MyTraverserVisitor(TraverserVisitor):
         self.process_expression(o)
         super().visit_name_expr(o)
 
-"""
     def visit_member_expr(self, o: MemberExpr) -> None:
         self.process_expression(o)
         super().visit_member_expr(o)
 
-
+"""
     def visit_yield_expr(self, o: YieldExpr) -> None:
         self.process_expression(o)
         super().visit_yield_expr(o)
