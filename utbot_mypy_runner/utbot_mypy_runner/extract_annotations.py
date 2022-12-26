@@ -434,7 +434,7 @@ def get_infos_of_nodes(nodes: tp.List) -> tp.List[NodeInfo]:
 
 
 def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
-                               source_paths: tp.List[str], module_for_types: tp.Optional[str]) -> str:
+                               source_paths: tp.List[str], file_for_types: tp.Optional[str]) -> str:
     annotation_dict: tp.Dict[str, tp.Dict[str, Definition]] = {}
     module_map: tp.Dict[str, str] = {}
     for module in build_result.files.keys():
@@ -458,7 +458,8 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
                 annotation_dict[module][name] = definition
 
     expression_types: tp.Dict[str, tp.List[ExpressionType]] = defaultdict(list)
-    if module_for_types is not None:
+    if file_for_types is not None:
+        module_for_types = module_map[file_for_types]
         mypy_file = build_result.files[module_for_types]
         with open(mypy_file.path, "r") as file:
             content = file.readlines()
