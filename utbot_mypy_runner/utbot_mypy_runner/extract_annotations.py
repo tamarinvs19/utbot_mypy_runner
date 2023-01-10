@@ -380,7 +380,8 @@ class ExpressionType:
 
 def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]], 
                     expression_types: tp.Dict[str, tp.List[ExpressionType]],
-                    module_map: tp.Dict[str, str]):
+                    module_map: tp.Dict[str, str],
+                    names_dict: tp.Dict[str, tp.List[str]]):
     result: tp.Dict[str, tp.Any] = {'nodeStorage': {}, 'types': {}}
     for key in annotation_node_dict:
         result['nodeStorage'][str(key)] = annotation_node_dict[key].encode()
@@ -394,6 +395,7 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]],
         result['types'][module] = [x.encode() for x in expression_types[module]]
 
     result['fileToModule'] = module_map
+    result['names'] = names_dict
 
     return json.dumps(result)
 
@@ -407,9 +409,10 @@ def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
     return False
 
 
-def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
-                               source_paths: tp.List[str], file_for_types: tp.Optional[str]) -> str:
+def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source_paths: tp.List[str],
+                               file_for_types: tp.Optional[str], file_for_names: tp.Optional[str]) -> str:
     annotation_dict: tp.Dict[str, tp.Dict[str, Definition]] = {}
+    names_dict: tp.Dict[str, tp.List[str]] = {}
     module_map: tp.Dict[str, str] = {}
     for module in build_result.files.keys():
         annotation_dict[module] = {}
@@ -417,6 +420,9 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
 
         if mypy_file.path in source_paths:
             module_map[mypy_file.path] = module
+
+        if mypy_file.path == file_for_names:
+            names_dict[module] = list(build_result.files[module].names.keys())
 
         for name in mypy_file.names.keys():
             symbol_table_node = build_result.files[module].names[name]
@@ -441,4 +447,4 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
             traverser = expression_traverser.MyTraverserVisitor(build_result.types, processor)
             traverser.visit_mypy_file(build_result.files[module_for_types])
 
-    return get_output_json(annotation_dict, expression_types, module_map)
+    return get_output_json(annotation_dict, expression_types, module_map, names_dict)

@@ -13,6 +13,7 @@ parser.add_argument('--mypy_stdout')
 parser.add_argument('--mypy_stderr')
 parser.add_argument('--mypy_exit_status')
 parser.add_argument('--file_for_types')
+parser.add_argument('--file_for_names')
 
 args = parser.parse_args()
 
@@ -44,5 +45,5 @@ if args.mypy_exit_status is not None:
 if args.annotations_out is not None:
     if build_result is not None:
         with open(args.annotations_out, "w") as file:
-            file.write(extraction.get_result_from_mypy_build(build_result, args.sources, args.file_for_types))
+            file.write(extraction.get_result_from_mypy_build(build_result, args.sources, args.file_for_types, args.file_for_names))
         print("Extracted annotations and wrote to", args.annotations_out)
