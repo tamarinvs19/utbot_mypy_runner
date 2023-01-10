@@ -2,12 +2,12 @@ import argparse
 
 import utbot_mypy_runner.mypy_main as mypy_main
 import utbot_mypy_runner.extract_annotations as extraction
-import utbot_mypy_runner.expression_traverser as expression_traverser
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', required=True)
 parser.add_argument('--sources', required=True, nargs='+')
+parser.add_argument('--modules', required=True, nargs='+')
 parser.add_argument('--annotations_out')
 parser.add_argument('--mypy_stdout')
 parser.add_argument('--mypy_stderr')
@@ -16,9 +16,15 @@ parser.add_argument('--file_for_types')
 
 args = parser.parse_args()
 
-stdout, stderr, exit_status, build_result = mypy_main.run(
-     args.sources + ["--config-file", args.config]
-)
+if len(args.sources) != len(args.modules):
+    print("Sources must correspond to modules")
+    exit(1)
+
+mypy_args = ["--config-file", args.config]
+for module_name in args.modules:
+    mypy_args += ["-m", module_name]
+
+stdout, stderr, exit_status, build_result = mypy_main.run(mypy_args)
 
 if args.mypy_stdout is not None:
     with open(args.mypy_stdout, "w") as file:
