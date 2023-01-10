@@ -15,7 +15,6 @@ from utbot_mypy_runner.utils import get_borders
 
 annotation_node_dict: tp.Dict[str, "AnnotationNode"] = {}
 type_vars_of_node: tp.Dict[str, tp.List[str]] = defaultdict(list)
-current_file: tp.Optional[tp.List[str]] = None
 any_type_instance = mypy.types.AnyType(mypy.types.TypeOfAny.unannotated)
 
 
@@ -128,10 +127,9 @@ class CompositeAnnotationNode(AnnotationNode):
         self.simple_name: str = symbol_node._fullname.split('.')[-1]
 
         self.names: tp.Dict[str, Definition] = {}
-        defs: tp.List[NodeInfo] = get_infos_of_nodes([x.node for x in symbol_node.names.values()])
         for name in symbol_node.names.keys():
             inner_symbol_node = symbol_node.names[name]
-            definition = get_definition_from_node(inner_symbol_node, False, self.namespace, defs, name)
+            definition = get_definition_from_node(inner_symbol_node, False, self.namespace, self.module, name)
             if definition is not None:
                 self.names[name] = definition
 
@@ -287,18 +285,16 @@ def get_annotation(mypy_type: mypy.types.Type, meta: Meta) -> Annotation:
 
 
 class Definition:
-    def __init__(self, type_name: str, line: int, column: int):
+    def __init__(self, type_name: str):
         self.type_name = type_name
-        self.line = line
-        self.column = column
 
     def encode(self):
         return {"kind": self.type_name}
 
 
 class TypeDefinition(Definition):
-    def __init__(self, type_info: mypy.nodes.TypeInfo, line: int, column: int):
-        super().__init__("Type", line, column)
+    def __init__(self, type_info: mypy.nodes.TypeInfo):
+        super().__init__("Type")
         self.annotation: Annotation = get_annotation(
             mypy.types.Instance(type_info, []),
             # TODO: does this work for inner classes?
@@ -320,8 +316,8 @@ def get_function_default_annotation(node: mypy.nodes.FuncItem, meta: Meta) -> An
 
 
 class VarDefinition(Definition):
-    def __init__(self, var: tp.Union[mypy.nodes.Var, mypy.nodes.FuncBase], meta: Meta, line: int, column: int):
-        super().__init__("Var", line, column)
+    def __init__(self, var: tp.Union[mypy.nodes.Var, mypy.nodes.FuncBase], meta: Meta):
+        super().__init__("Var")
 
         if isinstance(var, mypy.nodes.FuncBase):
             meta.is_class = var.is_class
@@ -346,24 +342,22 @@ def get_definition_from_node(
     table_node: mypy.nodes.SymbolTableNode,
     only_public: bool,
     namespace: Meta,
-    defined_nodes: tp.List["NodeInfo"],
+    module_name: str,
     name: str
 )-> tp.Optional[Definition]:
     if (only_public and not table_node.module_public) or table_node.node is None \
-            or not any(name == x.name for x in defined_nodes) \
+            or not (table_node.node.fullname.startswith(module_name)) \
             or not isinstance(table_node.node, mypy.nodes.Node):
         return None
 
     node = table_node.node
-    info = next(filter(lambda x: x.name == name, defined_nodes))
-    # sys.stderr.write(f"{info.line} {info.column} {info.end_line} {info.end_column}\n")
 
     if isinstance(node, mypy.nodes.TypeInfo):
-        return TypeDefinition(node, info.line, info.column)
+        return TypeDefinition(node)
     elif isinstance(node, mypy.nodes.Var) or isinstance(node, mypy.nodes.FuncBase):
-        return VarDefinition(node, namespace, info.line, info.column)
+        return VarDefinition(node, namespace)
     elif isinstance(node, mypy.nodes.Decorator):
-        return VarDefinition(node.var, namespace, info.line, info.column)
+        return VarDefinition(node.var, namespace)
     else:
         return None
 
@@ -404,33 +398,13 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]],
     return json.dumps(result)
 
 
-class NodeInfo:
-    def __init__(self, name: str, node: mypy.nodes.Node):
-        self.name = name
-        self.line = node.line
-        self.column = node.column
-        self.end_line = node.end_line
-        self.end_column = node.end_column
+def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
 
-    def set_end(self, line, column):
-        self.end_line = line
-        self.end_column = column
-
-
-def get_info_of_node(node) -> tp.Optional[NodeInfo]:
-    if isinstance(node, mypy.nodes.SymbolNode) or isinstance(node, mypy.nodes.ClassDef):
-        return NodeInfo(node.name, node)
-
-    return None
-
-
-def get_infos_of_nodes(nodes: tp.List) -> tp.List[NodeInfo]:
-    result = []
-    for node in nodes:
-        name = get_info_of_node(node)
-        if name is not None:
-            result.append(name)
-    return result
+    if isinstance(node.node, mypy.nodes.TypeInfo):
+        x = node.node
+        return x.is_named_tuple or (x.typeddict_type is not None) or x.is_newtype or x.is_intersection
+    
+    return False
 
 
 def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
@@ -441,19 +415,16 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult,
         annotation_dict[module] = {}
         mypy_file: mypy.nodes.MypyFile = build_result.files[module]
 
-        defs: tp.List[NodeInfo]
         if mypy_file.path in source_paths:
-            with open(mypy_file.path, "r") as file:
-                current_file = file.readlines()
-            defs = get_infos_of_nodes(mypy_file.defs)
             module_map[mypy_file.path] = module
-        else:
-            current_file = None
-            defs = get_infos_of_nodes([x.node for x in mypy_file.names.values()])
 
         for name in mypy_file.names.keys():
             symbol_table_node = build_result.files[module].names[name]
-            definition = get_definition_from_node(symbol_table_node, True, Meta(), defs, name)
+
+            if skip_node(symbol_table_node):
+                continue
+
+            definition = get_definition_from_node(symbol_table_node, True, Meta(), module, name)
             if definition is not None:
                 annotation_dict[module][name] = definition
 
