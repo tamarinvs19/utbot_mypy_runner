@@ -401,7 +401,7 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]],
     for module in names_dict.keys():
         result['names'][module] = [x.encode() for x in names_dict[module]]
 
-    return json.dumps(result, indent=2)
+    return json.dumps(result)
 
 
 def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
