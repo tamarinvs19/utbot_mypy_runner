@@ -399,9 +399,9 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]],
 
     result['names'] = {}
     for module in names_dict.keys():
-        result['names'][module] = {x.name: x.type_ for x in names_dict[module]}
+        result['names'][module] = [x.encode() for x in names_dict[module]]
 
-    return json.dumps(result)
+    return json.dumps(result, indent=2)
 
 
 def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
@@ -414,9 +414,9 @@ def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
 
 
 def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source_paths: tp.List[str],
-                               file_for_types: tp.Optional[str], file_for_names: tp.Optional[str]) -> str:
+                               file_for_types: tp.Optional[str]) -> str:
     annotation_dict: tp.Dict[str, tp.Dict[str, Definition]] = {}
-    names_dict: tp.Dict[str, tp.List[utbot_mypy_runner.names.Name]] = {}
+    names_dict: tp.Dict[str, tp.List[utbot_mypy_runner.names.Name]] = utbot_mypy_runner.names.get_names(build_result)
     module_map: tp.Dict[str, str] = {}
     for module in build_result.files.keys():
         annotation_dict[module] = {}
@@ -424,9 +424,6 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source
 
         if mypy_file.path in source_paths:
             module_map[mypy_file.path] = module
-
-        if mypy_file.path == file_for_names:
-            names_dict[module] = utbot_mypy_runner.names.get_names(build_result.files[module].names)
 
         for name in mypy_file.names.keys():
             symbol_table_node = build_result.files[module].names[name]
