@@ -346,7 +346,7 @@ def get_definition_from_node(
     module_name: str,
     name: str
 )-> tp.Optional[Definition]:
-    if (only_public and not table_node.module_public) or table_node.node is None \
+    if (only_public and table_node.module_hidden) or table_node.node is None \
             or not (table_node.node.fullname.startswith(module_name)) \
             or not isinstance(table_node.node, mypy.nodes.Node):
         return None
