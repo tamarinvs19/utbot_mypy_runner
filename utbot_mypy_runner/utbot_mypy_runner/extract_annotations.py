@@ -1,5 +1,3 @@
-import os
-import sys
 import json
 import typing as tp
 import copy
@@ -125,7 +123,7 @@ class CompositeAnnotationNode(AnnotationNode):
         super().__init__(type_name, id_, namespace)
         self.namespace.fullname_to_node_id[symbol_node._fullname] = id_
         self.module: str = symbol_node.module_name
-        self.simple_name: str = symbol_node._fullname.split('.')[-1]
+        self.simple_name: str = symbol_node._fullname[len(self.module)+1:]
 
         self.names: tp.Dict[str, Definition] = {}
         for name in symbol_node.names.keys():
