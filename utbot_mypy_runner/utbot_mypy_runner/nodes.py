@@ -249,7 +249,13 @@ class FunctionNode(AnnotationNode):
             self.type_vars = type_vars_of_node[id_]
         elif isinstance(type, mypy.nodes.FuncItem):
             self.type_vars = []
-            self.arg_types = [get_annotation(any_type_instance, meta=self.meta) for _ in type.arguments]
+            first_arg = []
+            if len(type.arguments) and type.arguments[0].variable.is_self:
+                first_arg = [Annotation(self.meta.containing_class)]
+            elif len(type.arguments):
+                first_arg = [get_annotation(any_type_instance, meta=self.meta)]
+            
+            self.arg_types = first_arg + [get_annotation(any_type_instance, meta=self.meta) for _ in type.arguments[1:]]
             self.return_type = get_annotation(any_type_instance, meta=self.meta)
             self.arg_kinds = [self._get_arg_kind(x) for x in type.arg_kinds]
             self.arg_names = type.arg_names
@@ -297,6 +303,7 @@ class CompositeAnnotationNode(AnnotationNode):
         self.module: str = symbol_node.module_name
         self.simple_name: str = symbol_node._fullname[len(self.module)+1:]
 
+        self.meta.containing_class = id_
         self.members: tp.List[Definition] = []
         for name in symbol_node.names.keys():
             inner_node = symbol_node.names[name].node
@@ -305,6 +312,8 @@ class CompositeAnnotationNode(AnnotationNode):
             definition = get_definition_from_node(inner_node, self.meta)
             if definition is not None:
                 self.members.append(definition)
+        
+        self.meta.containing_class = None
 
         self.raw_type_vars: tp.Sequence[mypy.types.Type] = symbol_node.defn.type_vars
         self.type_vars: tp.List[Annotation] = [
@@ -376,6 +385,7 @@ class Meta:
         self.fullname_to_node_id: tp.Dict[str, str] = {}
         self.module_name = module_name
         self.is_arg = is_arg
+        self.containing_class = None
 
 
 def get_annotation_node(mypy_type: mypy.types.Type, meta: Meta) -> AnnotationNode:
