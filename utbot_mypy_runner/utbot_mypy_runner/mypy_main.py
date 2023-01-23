@@ -1,5 +1,4 @@
 from mypy.main import *
-import mypy.nodes
 
 import sys
 
@@ -143,13 +142,13 @@ if __name__ == "__main__":
         print("BuildResult is None")
     else:
         pass
+        #print(build_result.files['builtins'].names['str'].node.names["count"].node.arguments[2].initializer)
         #print(build_result.files['dijkstra'].names['Dijkstra'].node.names['Node'].node.module_name)
         #print(build_result.files['numpy'].names['ndarray'].module_public)
         #print(build_result.files['_pytest.runner'].names['<subclass of "Node" and "tuple">'].node.is_intersection)
         #print(build_result.files['subtypes'].names['P'].node.names['f'].fullname)
         #print([build_result.files['subtypes'].names[x].fullname for x in build_result.files['subtypes'].names])
         #print(build_result.files['collections'].names['deque'].node.mro)
-        #print(build_result.files['builtins'].names['str'].node.bases)
         #print(build_result.files['collections'].names['Counter'].node._promote)
         #for x in build_result.files['builtins'].names['set'].node.defn.type_vars:
         #    print(type(x))

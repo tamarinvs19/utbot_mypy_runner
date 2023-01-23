@@ -12,7 +12,7 @@ class MyTraverserVisitor(TraverserVisitor):
 
     def process_expression(self, o: Expression) -> None:
         if o in self.types.keys() and not isinstance(self.types[o], mypy.types.AnyType) \
-            and o.end_line is not None and o.end_column is not None:
+            and o.end_line is not None and o.end_column is not None and o.line >= 0:
             self.processor(o.line, o.column, o.end_line, o.end_column, self.types[o])
 
     def visit_name_expr(self, o: NameExpr) -> None:
