@@ -464,16 +464,16 @@ def get_annotation(mypy_type: mypy.types.Type, meta: Meta) -> Annotation:
         return Annotation(cur_node.id_)
 
 
-def get_definition_from_node(node: mypy.nodes.Node, meta: Meta) -> tp.Optional[Definition]:
+def get_definition_from_node(node: mypy.nodes.Node, meta: Meta, only_types: bool = False) -> tp.Optional[Definition]:
     if isinstance(node, mypy.nodes.TypeInfo):
         return ClassDef(node, meta)
-    elif isinstance(node, mypy.nodes.FuncDef):
+    elif not only_types and isinstance(node, mypy.nodes.FuncDef):
         return FuncDef(node, meta)
-    elif isinstance(node, mypy.nodes.OverloadedFuncDef):
+    elif not only_types and isinstance(node, mypy.nodes.OverloadedFuncDef):
         return OverloadedFuncDef(node, meta)
-    elif isinstance(node, mypy.nodes.Var):
+    elif not only_types and isinstance(node, mypy.nodes.Var):
         return Variable(node, meta)
-    elif isinstance(node, mypy.nodes.Decorator):
+    elif not only_types and isinstance(node, mypy.nodes.Decorator):
         return Variable(node.var, meta)
     else:
         return None
@@ -481,10 +481,11 @@ def get_definition_from_node(node: mypy.nodes.Node, meta: Meta) -> tp.Optional[D
 
 def get_definition_from_symbol_node(
     table_node: mypy.nodes.SymbolTableNode,
-    meta: Meta
+    meta: Meta,
+    only_types: bool = False
 )-> tp.Optional[Definition]:
     if table_node.node is None or not (table_node.node.fullname.startswith(meta.module_name)) \
             or not isinstance(table_node.node, mypy.nodes.Node):  # this check is only for mypy
         return None
 
-    return get_definition_from_node(table_node.node, meta)
+    return get_definition_from_node(table_node.node, meta, only_types)

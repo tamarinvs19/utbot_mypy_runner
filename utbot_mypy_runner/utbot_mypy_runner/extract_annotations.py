@@ -78,7 +78,9 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source
             if skip_node(symbol_table_node):
                 continue
 
-            definition = get_definition_from_symbol_node(symbol_table_node, Meta(module))
+            only_types = mypy_file.path not in source_paths
+
+            definition = get_definition_from_symbol_node(symbol_table_node, Meta(module), only_types)
             if definition is not None:
                 annotation_dict[module][name] = definition
 
