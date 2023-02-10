@@ -63,12 +63,14 @@ class Variable(Definition):
     is_property_key = 'isProperty'
     is_self_key = 'isSelf'
     type_key = 'type'
+    is_initialized_in_class_key = 'isInitializedInClass'
 
     def __init__(self, var: mypy.nodes.Var, meta: 'Meta'):
         super().__init__(self.kind, meta)
         self.name: str = var.name
         self.is_property: bool = var.is_property
         self.is_self: bool = var.is_self
+        self.is_initialized_in_class: bool = var.is_initialized_in_class
         self.type: Annotation
         if var.type is None or self.meta.is_arg:
             self.type = get_annotation(any_type_instance, self.meta)
@@ -81,7 +83,8 @@ class Variable(Definition):
             self.name_key: self.name,
             self.is_property_key: self.is_property,
             self.is_self_key: self.is_self,
-            self.type_key: self.type.encode()
+            self.type_key: self.type.encode(),
+            self.is_initialized_in_class_key: self.is_initialized_in_class
         }
         return dict(superclass_dict, **subclass_dict)
 

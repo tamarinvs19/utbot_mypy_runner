@@ -141,7 +141,7 @@ if __name__ == "__main__":
     if build_result is None:
         print("BuildResult is None")
     else:
-        pass
+        print(build_result.files['utbot_mypy_runner.nodes'].names['CompositeAnnotationNode'].node.names["module_key"].node.is_initialized_in_class)
         #print(build_result.files['builtins'].names['str'].node.names["count"].node.arguments[2].initializer)
         #print(build_result.files['dijkstra'].names['Dijkstra'].node.names['Node'].node.module_name)
         #print(build_result.files['numpy'].names['ndarray'].module_public)
