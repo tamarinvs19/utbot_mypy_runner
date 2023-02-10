@@ -14,6 +14,7 @@ parser.add_argument('--mypy_stdout')
 parser.add_argument('--mypy_stderr')
 parser.add_argument('--mypy_exit_status')
 parser.add_argument('--module_for_types')
+parser.add_argument('--indent', type=int)
 
 args = parser.parse_args()
 
@@ -46,7 +47,7 @@ if args.annotations_out is not None:
     if build_result is not None:
         with open(args.annotations_out, "w") as file:
             sources = [os.path.abspath(x) for x in args.sources]
-            file.write(extraction.get_result_from_mypy_build(build_result, sources, args.module_for_types))
+            file.write(extraction.get_result_from_mypy_build(build_result, sources, args.module_for_types, args.indent))
         print("Extracted annotations and wrote to", args.annotations_out)
     else:
         print("For some reason BuildResult is None")

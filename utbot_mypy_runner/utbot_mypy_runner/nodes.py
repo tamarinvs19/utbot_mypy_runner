@@ -399,6 +399,10 @@ def get_annotation_node(mypy_type: mypy.types.Type, meta: Meta) -> AnnotationNod
         else:
             node = meta.fullname_to_node_id[mypy_type.id.namespace]
             id_ = '.' + str(mypy_type.id.raw_id) + '.' + node
+    elif isinstance(mypy_type, mypy.types.AnyType):
+        id_ = 'A'
+    elif isinstance(mypy_type, mypy.types.NoneType):
+        id_ = 'N'
     else:
         id_ = str(id(mypy_type))
 

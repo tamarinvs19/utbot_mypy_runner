@@ -30,7 +30,8 @@ class ExpressionType:
 
 def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]], 
                     expression_types: tp.Dict[str, tp.List[ExpressionType]],
-                    names_dict: tp.Dict[str, tp.List[utbot_mypy_runner.names.Name]]):
+                    names_dict: tp.Dict[str, tp.List[utbot_mypy_runner.names.Name]],
+                    indent: tp.Optional[int]):
     node_storage_key = 'nodeStorage'
     types_key = 'types'
     definitions_key = 'definitions'
@@ -53,7 +54,7 @@ def get_output_json(annotations: tp.Dict[str, tp.Dict[str, Definition]],
     for module in names_dict.keys():
         result[names_key][module] = [x.encode() for x in names_dict[module]]
 
-    return json.dumps(result)
+    return json.dumps(result, indent=indent)
 
 
 def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
@@ -66,7 +67,7 @@ def skip_node(node: mypy.nodes.SymbolTableNode) -> bool:
 
 
 def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source_paths: tp.List[str],
-                               module_for_types: tp.Optional[str]) -> str:
+                               module_for_types: tp.Optional[str], indent=None) -> str:
     annotation_dict: tp.Dict[str, tp.Dict[str, Definition]] = defaultdict(dict)
     names_dict: tp.Dict[str, tp.List[utbot_mypy_runner.names.Name]] = utbot_mypy_runner.names.get_names(build_result)
     for module in build_result.files.keys():
@@ -96,4 +97,4 @@ def get_result_from_mypy_build(build_result: mypy_main.build.BuildResult, source
             traverser = expression_traverser.MyTraverserVisitor(build_result.types, processor)
             traverser.visit_mypy_file(build_result.files[module_for_types])
 
-    return get_output_json(annotation_dict, expression_types, names_dict)
+    return get_output_json(annotation_dict, expression_types, names_dict, indent)
