@@ -3,36 +3,34 @@ from mypy.main import *
 import sys
 
 from io import StringIO
-from typing import List, Tuple, TextIO, Callable
+from typing import List, Tuple, TextIO, Callable, Optional, cast
 
 """
 Copy with some changes of function 'main' from here:
-https://github.com/python/mypy/blob/v0.971/mypy/main.py
+https://github.com/python/mypy/blob/v1.0.0/mypy/main.py
 """
-def new_main(script_path: Optional[str],
-         stdout: TextIO,
-         stderr: TextIO,
-         args: Optional[List[str]] = None,
-         clean_exit: bool = False,
-         ) -> Optional[build.BuildResult]:
+def new_main(
+    stdout: TextIO,
+    stderr: TextIO,
+    args: Optional[List[str]] = None,
+    clean_exit: bool = False
+) -> Optional[build.BuildResult]:
     """Main entry point to the type checker.
     Args:
-        script_path: Path to the 'mypy' script (used for finding data files).
         args: Custom command-line arguments.  If not given, sys.argv[1:] will
             be used.
         clean_exit: Don't hard kill the process on exit. This allows catching
             SystemExit.
     """
-    util.check_python_version('mypy')
+    util.check_python_version("mypy")
     t0 = time.time()
     # To log stat() calls: os.stat = stat_proxy
-    sys.setrecursionlimit(2 ** 14)
+    sys.setrecursionlimit(2**14)
     if args is None:
         args = sys.argv[1:]
 
     fscache = FileSystemCache()
-    sources, options = process_options(args, stdout=stdout, stderr=stderr,
-                                       fscache=fscache)
+    sources, options = process_options(args, stdout=stdout, stderr=stderr, fscache=fscache)
 
     # CHANGE: export types of AST nodes
     options.preserve_asts = True
@@ -41,7 +39,7 @@ def new_main(script_path: Optional[str],
     if clean_exit:
         options.fast_exit = False
 
-    formatter = util.FancyFormatter(stdout, stderr, options.show_error_codes)
+    formatter = util.FancyFormatter(stdout, stderr, options.hide_error_codes)
 
     if options.install_types and (stdout is not sys.stdout or stderr is not sys.stderr):
         # Since --install-types performs user input, we want regular stdout and stderr.
@@ -51,16 +49,16 @@ def new_main(script_path: Optional[str],
         fail("error: --non-interactive is only supported with --install-types", stderr, options)
 
     if options.install_types and not options.incremental:
-        fail("error: --install-types not supported with incremental mode disabled",
-             stderr, options)
+        fail(
+            "error: --install-types not supported with incremental mode disabled", stderr, options
+        )
 
     if options.install_types and options.python_executable is None:
-        fail("error: --install-types not supported without python executable or site packages",
-             stderr, options)
-
-    if options.install_types and not sources:
-        install_types(formatter, options, non_interactive=options.non_interactive)
-        return None
+        fail(
+            "error: --install-types not supported without python executable or site packages",
+            stderr,
+            options,
+        )
 
     res, messages, blockers = run_build(sources, options, fscache, t0, stdout, stderr)
 
@@ -76,22 +74,22 @@ def new_main(script_path: Optional[str],
 
     if MEM_PROFILE:
         from mypy.memprofile import print_memory_profile
+
         print_memory_profile()
 
     code = 0
-    if messages:
+    n_errors, n_notes, n_files = util.count_stats(messages)
+    if messages and n_notes < len(messages):
         code = 2 if blockers else 1
     if options.error_summary:
-        n_errors, n_notes, n_files = util.count_stats(messages)
         if n_errors:
             summary = formatter.format_error(
-                n_errors, n_files, len(sources), blockers=blockers,
-                use_color=options.color_output
+                n_errors, n_files, len(sources), blockers=blockers, use_color=options.color_output
             )
-            stdout.write(summary + '\n')
+            stdout.write(summary + "\n")
         # Only notes should also output success
         elif not messages or n_notes == len(messages):
-            stdout.write(formatter.format_success(len(sources), options.color_output) + '\n')
+            stdout.write(formatter.format_success(len(sources), options.color_output) + "\n")
         stdout.flush()
 
     if options.install_types and not options.non_interactive:
@@ -109,9 +107,8 @@ Copy with some changes of mypy api functions from here:
 https://github.com/python/mypy/blob/v0.971/mypy/api.py
 """
 def _run(
-    main_wrapper: Callable[[TextIO, TextIO],
-    Optional[build.BuildResult]]
-)-> Tuple[str, str, int, Optional[build.BuildResult]]:
+    main_wrapper: Callable[[TextIO, TextIO], Optional[build.BuildResult]]
+) -> Tuple[str, str, int, Optional[build.BuildResult]]:
 
     stdout = StringIO()
     stderr = StringIO()
@@ -121,15 +118,14 @@ def _run(
         res = main_wrapper(stdout, stderr)
         exit_status = 0
     except SystemExit as system_exit:
-        exit_status = system_exit.code
+        exit_status = cast(int, system_exit.code)
 
     return stdout.getvalue(), stderr.getvalue(), exit_status, res
 
 
 def run(args: List[str]) -> Tuple[str, str, int, Optional[build.BuildResult]]:
     args.append("--no-incremental")
-    return _run(lambda stdout, stderr: new_main(None, args=args,
-                                                stdout=stdout, stderr=stderr, clean_exit=True))
+    return _run(lambda stdout, stderr: new_main(args=args, stdout=stdout, stderr=stderr, clean_exit=True))
 
 
 if __name__ == "__main__":
