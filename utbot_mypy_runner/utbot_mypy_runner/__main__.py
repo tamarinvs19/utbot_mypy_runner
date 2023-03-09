@@ -20,7 +20,7 @@ args = parser.parse_args()
 
 if len(args.sources) != len(args.modules):
     print("Sources must correspond to modules")
-    exit(1)
+    exit(10)
 
 mypy_args = ["--config-file", args.config]
 for module_name in args.modules:
@@ -51,4 +51,4 @@ if args.annotations_out is not None:
         print("Extracted annotations and wrote to", args.annotations_out)
     else:
         print("For some reason BuildResult is None")
-        exit(1)
+        exit(11)

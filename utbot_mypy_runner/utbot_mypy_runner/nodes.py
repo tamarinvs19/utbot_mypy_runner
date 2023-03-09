@@ -1,6 +1,7 @@
 import typing as tp
 from collections import defaultdict
 import copy
+import sys
 
 import mypy.nodes
 import mypy.types
@@ -11,6 +12,12 @@ type_vars_of_node: tp.Dict[str, tp.List[str]] = defaultdict(list)
 any_type_instance = mypy.types.AnyType(mypy.types.TypeOfAny.unannotated)
 
 
+if sys.version_info >= (3, 10):
+    EncodedInfo: tp.TypeAlias = tp.Union[str, bool, tp.Dict[str, 'EncodedInfo'], tp.List['EncodedInfo']]
+else:
+    EncodedInfo = tp.Any
+
+
 class Annotation:
     node_id_key = "nodeId"
     args_key = "args"  # optional
@@ -19,11 +26,24 @@ class Annotation:
         self.node_id = node_id
         self.args = args
 
-    def encode(self):
-        result = {self.node_id_key: str(self.node_id)}
+    def encode(self) -> tp.Dict[str, EncodedInfo]:
+        result: tp.Dict[str, EncodedInfo] = {self.node_id_key: str(self.node_id)}
         if self.args is not None:
             result[self.args_key] = [x.encode() for x in self.args]
         return result
+
+
+def encode_extension(super_encode: tp.Callable[[tp.Any], tp.Dict[str, EncodedInfo]]):
+
+    def decorator(func: tp.Callable[[tp.Any], tp.Dict[str, EncodedInfo]]):
+        def wrapper(self) -> tp.Dict[str, EncodedInfo]:
+            superclass_dict = super_encode(self)
+            subclass_dict = func(self)
+            return dict(superclass_dict, **subclass_dict)
+
+        return wrapper
+
+    return decorator
 
 
 class AnnotationNode:
@@ -35,7 +55,7 @@ class AnnotationNode:
         annotation_node_dict[id_] = self
         self.meta = copy.deepcopy(meta)
 
-    def encode(self):
+    def encode(self) -> tp.Dict[str, EncodedInfo]:
         return {self.type_key: self.type}
 
     def __eq__(self, other):
@@ -52,7 +72,7 @@ class Definition:
         self.kind = kind
         self.meta = copy.deepcopy(meta)
 
-    def encode(self):
+    def encode(self) -> tp.Dict[str, EncodedInfo]:
         return {self.kind_key: self.kind}
 
 
@@ -75,15 +95,14 @@ class Variable(Definition):
         else:
             self.type = get_annotation(var.type, self.meta)
 
-    def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {
+    @encode_extension(Definition.encode)
+    def encode(self) -> tp.Dict[str, EncodedInfo]:
+        return {
             self.name_key: self.name,
             self.is_property_key: self.is_property,
             self.is_self_key: self.is_self,
             self.type_key: self.type.encode()
         }
-        return dict(superclass_dict, **subclass_dict)
 
 
 class ClassDef(Definition):
@@ -95,10 +114,9 @@ class ClassDef(Definition):
         super().__init__(self.kind, meta)
         self.type: Annotation = get_annotation(mypy.types.Instance(type_info, []), self.meta)
 
+    @encode_extension(Definition.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {self.type_key: self.type.encode()}
-        return dict(superclass_dict, **subclass_dict)
+        return {self.type_key: self.type.encode()}
 
 
 class FuncDef(Definition):
@@ -127,14 +145,13 @@ class FuncDef(Definition):
             self.args.append(defn)
         self.meta.is_arg = False
 
+    @encode_extension(Definition.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {
+        return {
             self.args_key: [x.encode() for x in self.args],
             self.type_key: self.type.encode(),
             self.name_key: self.name
         }
-        return dict(superclass_dict, **subclass_dict)
 
 
 class OverloadedFuncDef(Definition):
@@ -160,14 +177,13 @@ class OverloadedFuncDef(Definition):
         
         self.name: str = func_def.name
 
+    @encode_extension(Definition.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {
+        return {
             self.type_key: self.type.encode(),
             self.items_key: [x.encode() for x in self.items],
             self.name_key: self.name
         }
-        return dict(superclass_dict, **subclass_dict)
 
 
 class TypeVarNode(AnnotationNode):
@@ -202,16 +218,15 @@ class TypeVarNode(AnnotationNode):
         else:
             self.variance = self.invariant
 
+    @encode_extension(AnnotationNode.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {
+        return {
             self.var_name_key: self.name,
             self.values_key: [x.encode() for x in self.values],
             self.upper_bound_key: self.upper_bound.encode(),
             self.def_key: self.def_id,
             self.variance_key: self.variance
         }
-        return dict(superclass_dict, **subclass_dict)
 
 
 class FunctionNode(AnnotationNode):
@@ -278,16 +293,15 @@ class FunctionNode(AnnotationNode):
         else:
             assert False, "Not reachable"
 
+    @encode_extension(AnnotationNode.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {
+        return {
             self.type_vars_key: self.type_vars,
             self.arg_types_key: [x.encode() for x in self.arg_types],
             self.return_type_key: self.return_type.encode(),
             self.arg_kinds_key: self.arg_kinds,
             self.arg_names_key: self.arg_names
         }
-        return dict(superclass_dict, **subclass_dict)
 
 
 class CompositeAnnotationNode(AnnotationNode):
@@ -321,16 +335,15 @@ class CompositeAnnotationNode(AnnotationNode):
         ]
         self.bases: tp.List[Annotation] = [get_annotation(x, self.meta) for x in symbol_node.bases]
 
+    @encode_extension(AnnotationNode.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {
+        return {
             self.module_key: self.module,
             self.simple_name_key: self.simple_name,
             self.members_key: [x.encode() for x in self.members],
             self.type_vars_key: [x.encode() for x in self.type_vars],
             self.bases_key: [x.encode() for x in self.bases]
         }
-        return dict(superclass_dict, **subclass_dict)
 
 
 class ConcreteAnnotationNode(CompositeAnnotationNode):
@@ -343,10 +356,9 @@ class ConcreteAnnotationNode(CompositeAnnotationNode):
         super().__init__(self.annotation_type, symbol_node, id_, meta)
         self.is_abstract: bool = symbol_node.is_abstract
 
+    @encode_extension(CompositeAnnotationNode.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {self.is_abstract_key: self.is_abstract}
-        return dict(superclass_dict, **subclass_dict)
+        return {self.is_abstract_key: self.is_abstract}
 
 
 class ProtocolAnnotationNode(CompositeAnnotationNode):
@@ -359,10 +371,9 @@ class ProtocolAnnotationNode(CompositeAnnotationNode):
         super().__init__(self.annotation_type, symbol_node, id_, meta)
         self.member_names: tp.List[str] = symbol_node.protocol_members
 
+    @encode_extension(CompositeAnnotationNode.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {self.member_names_key: self.member_names}
-        return dict(superclass_dict, **subclass_dict)
+        return {self.member_names_key: self.member_names}
 
 
 class AnnotationNodeWithItems(AnnotationNode):
@@ -374,10 +385,23 @@ class AnnotationNodeWithItems(AnnotationNode):
             get_annotation(x, self.meta) for x in mypy_type.items
         ]
 
+    @encode_extension(AnnotationNode.encode)
     def encode(self):
-        superclass_dict = super().encode()
-        subclass_dict = {self.items_key: [x.encode() for x in self.items]}
-        return dict(superclass_dict, **subclass_dict)
+        return {self.items_key: [x.encode() for x in self.items]}
+
+
+class TypeAliasNode(AnnotationNode):
+    annotation_type = 'TypeAlias'
+
+    target_key = 'target'
+
+    def  __init__(self, alias: mypy.nodes.TypeAlias, id_: str, meta: 'Meta'):
+        super().__init__(self.annotation_type, id_, meta)
+        self.target: Annotation = get_annotation(alias.target, meta)
+
+    @encode_extension(AnnotationNode.encode)
+    def encode(self):
+        return {self.target_key: self.target.encode()}
 
 
 class Meta:
@@ -438,8 +462,8 @@ def get_annotation_node(mypy_type: mypy.types.Type, meta: Meta) -> AnnotationNod
         result = AnnotationNode("NoneType", id_, meta)
 
     elif isinstance(mypy_type, mypy.types.TypeAliasType) and \
-            mypy_type.alias is not None:
-        return get_annotation_node(mypy_type.alias.target, meta)
+            mypy_type.alias is not None and len(mypy_type.args) == 0:
+        result = TypeAliasNode(mypy_type.alias, id_, meta)
 
     else:
         id_ = '0'
