@@ -4,3 +4,4 @@ dist/
 mypy_config.ini
 out.json
 *.swp
+out/
