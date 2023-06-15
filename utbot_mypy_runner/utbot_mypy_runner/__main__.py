@@ -25,6 +25,7 @@ if len(args.sources) != len(args.modules):
 mypy_args = ["--config-file", args.config]
 for module_name in args.modules:
     mypy_args += ["-m", module_name]
+mypy_args.append("--explicit-package-bases")
 
 stdout, stderr, exit_status, build_result = mypy_main.run(mypy_args)
 
